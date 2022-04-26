@@ -19,7 +19,7 @@ ed = .001; % SoC sample granularity
 e0 = .0; % initial SoC
 ef = .0; % final SoC target level, use 0 if none
 Ne = floor(1/ed)+1; % number of SOC samples
-seg_num = 5;% value function segment number
+seg_num = 1;% value function segment number
 sigma = 0;
 
 % % constant parameters
