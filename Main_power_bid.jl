@@ -16,8 +16,8 @@ Zone = "WALNUT" # price zone name
 fileln = matopen(string("./Data/",Zone,".mat"))
 RTP = read(fileln, "Q")
 close(fileln)
-dbid = readdlm("./Data/WALNUT_2016_Discharge_ConsOne.csv", ',', Float64)
-cbid = readdlm("./Data/WALNUT_2016_Charge_ConsOne.csv", ',', Float64)
+dbid = readdlm("./Data/WALNUT_2016_Discharge_One.csv", ',', Float64)
+cbid = readdlm("./Data/WALNUT_2016_Charge_One.csv", ',', Float64)
 
 # simulation setting
 T = 288; # time step per day
@@ -34,16 +34,20 @@ CB = cbid[:,1]
 E = [0.2 0.2 0.2 0.2 0.2]
 Pmax = 0.25; # power rating MW
 S = length(E)
-# Nonlinear Setting
-# Pd = transpose(Pmax*[0.7 1.0 1.0 0.9 0.5])
-# Pc = transpose(Pmax*[0.5 0.8 1.0 1.0 1.0])
-# eta = [0.80 0.85 0.90 0.85 0.80]
-# MC = [25 20 15 20 25]; # marginal discharge cost
+d0 = zeros(S,1)
+c0 = zeros(S,1)
+
 # Linear Setting
 Pd = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
 Pc = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
 eta = [0.90 0.90 0.90 0.90 0.90]
 MC = [20 20 20 20 20]; # marginal discharge cost
+
+# Nonlinear Setting
+Pd2 = transpose(Pmax*[0.7 1.0 1.0 0.9 0.5])
+Pc2 = transpose(Pmax*[0.5 0.8 1.0 1.0 1.0])
+eta2 = [0.80 0.85 0.90 0.85 0.80]
+MC2 = [25 20 15 20 25]; # marginal discharge cost
 
 e0 = [0.0 0.0 0.0 0.0 0.0]
 ef = e0
@@ -87,11 +91,48 @@ set_silent(model) # no outputs
 @objective(model, Max, sum(R+V))
 
 
+# initialize optimization model
+model2 = Model(Gurobi.Optimizer)
+set_silent(model2) # no outputs
+# discharge power
+@variable(model2, d2[1:S], lower_bound = 0)
+# charge power
+@variable(model2, c2[1:S], lower_bound = 0)
+# energy level
+@variable(model2, e2[1:S], lower_bound = 0)
+@variable(model2, C2[1:S]) # value of battery capacity at the end of operation
+@variable(model2, R2[1:S]) # market revenue
+# binary variables
+@variable(model2, u2[1:S], Bin)
+
+# arbitrage revenue
+@constraint(model2, ArbRev2[s=1:S], R2[s] == M*L*(d2[s]-c2[s]) )
+# piece-wise linear degradation (marginal discharge cost)
+@constraint(model2, DegCost2[s=1:S], C2[s] == M*MC2[s]*d2[s] )
+# SoC evolution
+@constraint(model2, SoCEvo2[s=1:S], e2[s] - e0[s] == M*(c2[s]*eta2[s] - d2[s]/eta2[s]) )
+# max discharge power
+@constraint(model2, DisMax2, sum(d2[:]./Pd2) <= Lp )
+# max charge power
+@constraint(model2, ChrMax2, sum(c2[:]./Pc2) <= 1 )
+# max energy level
+@constraint(model2, SoCMax12, e2[1] <= E[1] )
+@constraint(model2, SoCMax22[s=2:S], e2[s] <= E[s]*u2[s-1] )
+# min energy level
+@constraint(model2, SoCMin12[s=1:S-1], e2[s] >= E[s]*u2[s] )
+@constraint(model2, SoCMin22, e2[S] >= 0 )
+
+# maximize revenue plus degradation value
+@objective(model2, Min, sum((d2-d0).^2+(c2-c0).^2))
+
 
 # initialize
 R_s = zeros(T, N_sim)
 P_s = zeros(T, N_sim)
 C_s = zeros(T, N_sim)
+R_s2 = zeros(T, N_sim)
+P_s2 = zeros(T, N_sim)
+C_s2 = zeros(T, N_sim)
 
 @time begin
 
@@ -116,19 +157,35 @@ for t = 1:T
     end
     optimize!(model)
 
+    local d0 = value.(d)
+    local c0 = value.(c)
+    new_objective = @expression(model2, sum((d2-d0).^2+(c2-c0).^2))
+    set_objective_function(model2, new_objective)
+    set_normalized_rhs(DisMax2, Lp)
+    for s = 1:S
+        set_normalized_coefficient(ArbRev2[s], d2[s], -M*L )
+        set_normalized_coefficient(ArbRev2[s], c2[s], M*L )
+        set_normalized_rhs(SoCEvo2[s], e0[s])
+    end
+    optimize!(model2)
+
     #update SoC
     for s = 1:S
-        global e0[s] = round(value(e[s]),digits=6)
+        global e0[s] = round(value(e2[s]),digits=6)
     end
 
     global R_s[t,n] = value(sum(R))# objective_value(model);
     global C_s[t,n] = value(sum(C))
     global P_s[t,n] = value(sum(R-C))
     termination_status(model)
+    global R_s2[t,n] = value(sum(R2))# objective_value(model);
+    global C_s2[t,n] = value(sum(C2))
+    global P_s2[t,n] = value(sum(R2-C2))
+    termination_status(model2)
 end
 
 @printf("Finished Day %d, Cum Rev %d, Cum Profit %d, Cum Cost %d, OptStatus: %s \n", n, sum(R_s), sum(P_s), sum(C_s), termination_status(model))
-
+@printf("Finished Day %d, Cum Rev %d, Cum Profit %d, Cum Cost %d, OptStatus: %s \n", n, sum(R_s2), sum(P_s2), sum(C_s2), termination_status(model2))
 
 end
 end

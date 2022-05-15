@@ -1,4 +1,4 @@
-function vo = CalcValueNoUnc(d, c, P, eta, vi, ed, iC, iD)
+function vo = CalcValueNoUnc(d, c, eta, vi, ed, iC, iD)
 %%
 % Title: Calculate Risk-Neutral value function using deterministic price
 % Inputs:
