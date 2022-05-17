@@ -16,8 +16,8 @@ Zone = "WALNUT" # price zone name
 fileln = matopen(string("./Data/",Zone,".mat"))
 RTP = read(fileln, "Q")
 close(fileln)
-dbid = readdlm("./Data/WALNUT_2016_Discharge_ConsOne.csv", ',', Float64)
-cbid = readdlm("./Data/WALNUT_2016_Charge_ConsOne.csv", ',', Float64)
+dbid = readdlm("./Data/WALNUT_2016_Discharge.csv", ',', Float64)
+cbid = readdlm("./Data/WALNUT_2016_Charge.csv", ',', Float64)
 
 # simulation setting
 T = 288; # time step per day
@@ -35,15 +35,16 @@ E = [0.2 0.2 0.2 0.2 0.2]
 Pmax = 0.25; # power rating MW
 S = length(E)
 # Nonlinear Setting
-# Pd = transpose(Pmax*[0.7 1.0 1.0 0.9 0.5])
-# Pc = transpose(Pmax*[0.5 0.8 1.0 1.0 1.0])
-# eta = [0.80 0.85 0.90 0.85 0.80]
-# MC = [25 20 15 20 25]; # marginal discharge cost
+Pd = transpose(Pmax*[0.7 1.0 1.0 0.9 0.5])
+Pc = transpose(Pmax*[0.5 0.8 1.0 1.0 1.0])
+eta = [0.80 0.85 0.90 0.85 0.80]
+MC = [25 20 15 20 25]; # marginal discharge cost
+
 # Linear Setting
-Pd = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
-Pc = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
-eta = [0.90 0.90 0.90 0.90 0.90]
-MC = [20 20 20 20 20]; # marginal discharge cost
+# Pd = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
+# Pc = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
+# eta = [0.90 0.90 0.90 0.90 0.90]
+# MC = [20 20 20 20 20]; # marginal discharge cost
 
 e0 = [0.0 0.0 0.0 0.0 0.0]
 ef = e0

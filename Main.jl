@@ -33,9 +33,10 @@ Pd = transpose(Pmax*[0.7 1.0 1.0 0.9 0.5])
 Pc = transpose(Pmax*[0.5 0.8 1.0 1.0 1.0])
 eta = [0.80 0.85 0.90 0.85 0.80]
 MC = [25 20 15 20 25]; # marginal discharge cost
+
 # Linear Setting
-# Pc = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
 # Pd = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
+# Pc = transpose(Pmax*[1.0 1.0 1.0 1.0 1.0])
 # eta = [0.90 0.90 0.90 0.90 0.90]
 # MC = [20 20 20 20 20]; # marginal discharge cost
 
@@ -87,6 +88,7 @@ set_silent(model) # no outputs
 R_s = zeros(1, N_sim)
 P_s = zeros(1, N_sim)
 C_s = zeros(1, N_sim)
+S_s = zeros(5,N_sim*288)
 
 @time begin
 
@@ -113,6 +115,8 @@ optimize!(model)
 global R_s[n] = value(sum(R))# objective_value(model);
 global C_s[n] = value(sum(C))
 global P_s[n] = value(sum(R-C))
+global S_s[:,(n-1)*T+1:n*T] = transpose(value.(e))
+
 
 termination_status(model)
 @printf("Finished Day %d, Cum Rev %d, Cum Profit %d, Cum Cost %d, OptStatus: %s \n", n, sum(R_s), sum(P_s), sum(C_s), termination_status(model))
